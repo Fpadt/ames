@@ -22,7 +22,7 @@ execute:
 #| label: init
 #| eval:  FALSE
 
-install.packages("renv")
+#install.packages("renv")
 
 install.packages('rmarkdown') # needed for Quarto
 install.packages('curl')
