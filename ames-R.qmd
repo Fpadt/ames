@@ -1,0 +1,453 @@
+---
+title        : "Ames Housing in R"
+subtitle     : smart-R
+author       : Floris Padt
+date         : '2 Jun 2023'
+date-modified: '2 Jun 2023'
+abstract     : |
+               | JADS Ames housing
+               | excercises for JADS Foundation
+format:
+  html:
+    toc: true
+    code-fold: true
+editor: visual
+execute:
+  echo: false
+---
+
+![](images/logo.jpg){fig-align="right"}
+
+```{r}
+#| label: init
+#| eval:  FALSE
+
+install.packages("renv")
+
+install.packages('rmarkdown') # needed for Quarto
+install.packages('curl')
+install.packages('kableExtra')
+install.packages('DT')
+install.packages('data.table')
+install.packages('magrittr')
+
+install.packages('psych')
+install.packages('tidyverse')
+install.packages('corrplot')
+install.packages('ggplot2')
+install.packages('caret')
+install.packages('Metrics')
+install.packages('e1071')
+install.packages('glmnet')
+```
+
+```{r}
+#| label:   setup
+#| eval:    TRUE
+#| results: hide
+
+invisible({
+  library(psych)      # package to describe your data
+  library(tidyverse)  # easy way to subset your data
+  library(corrplot)   # to draw correlation plots
+  library(ggplot2)    # to plot graphs
+  library(caret)      # to run machine learning models
+  library(Metrics)    # to calculate RMSE
+  library(e1071)      # for statistical analyses
+  library(glmnet)     # for statistical analyses
+
+  library(kableExtra) # additional formatting for tables
+  library(DT)         # D3 tables
+  library(data.table) # extension of data.frames
+  library(magrittr)   # piping
+})
+
+options(scipen=999) # turn off scientific notation
+```
+
+```{r}
+#| label: read_data
+#| eval:  TRUE
+
+uri <- 
+  'https://raw.githubusercontent.com/jads-nl/discover-projects/main/' %>%
+  paste0(., 'ames-housing/AmesHousing.csv')
+
+df =  read.csv(uri, sep = ",", header = TRUE)
+dt <- fread(uri)
+
+```
+
+The "Ames Housing" dataset contains information from the Ames Assessor's Office used in computing assessed values for individual residential properties sold in Ames, Iowa \[IA\] from 2006 to 2010.\
+The dataset has 2,930 observations with 82 variables. For a complete description of all included variables, please look at: <https://rdrr.io/cran/AmesHousing/man/ames_raw.html>.
+
+## Exercise 1: Familiarize yourself with the data.
+
+Provide a table with descriptive statistics for all included variables and check:
+
+-   Classes of each of the variables (e.g. factors or continuous variables).
+
+-   Descriptive/summary statistics for all continuous variables (e.g. mean, SD, range) and factor variables (e.g. frequencies).
+
+-   Explore missing values: `sapply(df, function(x) sum(is.na(x)))`
+
+#### Data Set
+
+```{r}
+#| label: show hear using DT 
+DT::datatable(dt)
+```
+
+::: callout-note
+-   Use the base-R function `str` (no package needed)
+-   Use the `describe` function (from the psych-package) for continuous variables
+-   Use the `table` function (base-R) for factor variables.
+:::
+
+```{r}
+#| label: 'check the structure'
+
+# To check the structure of the data, you can use the "str"-command:
+str(df)
+```
+
+All factor variables now have the 'character' class.\
+The following code helps to convert each character variable into a factor variable:
+
+```{r}
+#| label: 'convert character to factor'
+
+df[sapply(df, is.character)] <- lapply(df[sapply(df, is.character)], as.factor)
+str(df)
+```
+
+```{r}
+#| label: Explore missing values
+
+sapply(df, function(x) sum(is.na(x))) 
+```
+
+```{r}
+#| label: describe numeric and integer variables
+
+df %>%
+  keep(is.numeric) %>% 
+  describe
+```
+
+```{r}
+#| label: describe factor variables
+
+temp <- 
+  df %>%
+  keep(is.factor)
+
+for (i in 1:ncol(temp)) {
+  print(names(temp[i]))
+  print(table(temp[,i]))
+}
+```
+
+## Exercise 2:
+
+There a several missing values in the dataset, which need to be tackled before we can proceed with the rest of the analysis. There are many ways to impute missing values, but for now, impute missing values for numeric variables with the median, and impute missings in all factor variables with the label "100".
+
+```{r}
+#| label: Median imputation for continuous variables
+
+df <-
+  lapply(df, function(x) {
+    ### Impute median for all missing numeric values
+    if(is.numeric(x)) ifelse(is.na(x), median(x, na.rm=T), x) else x
+  }
+  ) %>%
+  data.frame()
+```
+
+```{r}
+#| label: 100 imputation for factor variables
+
+# generate a vector with variable names for all factor variables
+factor_variables <- 
+  df              %>%
+  keep(is.factor) %>% 
+  names
+
+# impute missing values for factor variables
+df<-
+  lapply(df,function(x) {
+    if(is.factor(x)) ifelse(is.na(x),"100",x) else x
+  }) %>%
+  data.frame()
+
+# convert factor variables back to factor variables 
+# (imputation turned them into character variables)
+df[factor_variables] <- lapply(df[factor_variables], factor)
+     
+```
+
+```{r}
+#| label: Check missing values
+
+sapply(df, function(x) sum(is.na(x)))
+```
+
+## Exercise 3:
+
+The variable "SalePrice" refers to the price at which a property was sold and hence is the variable of interest for our prediction model ("Y" or dependent variable).
+
+Please explore Y in terms of:
+
+-   Descriptive/summary statistics (e.g. mean, SDs, range)
+
+-   Visualize the distribution of Y (e.g. use base-R "hist" or "ggplot" from the "ggplot2"-package)
+
+-   Visualize the distribution of Y by looking at various subgroups\
+    (e.g. create boxplot or scatterplot using the "ggplot2"-package).
+
+-   Look at differences between neighborhoods.
+
+-   Look at differences between housing style.
+
+-   Draw a correlation plot to see all correlations between Y and the independent (numeric) variables.
+
+::: callout-note
+For visualization, ggplot is frequently used as it provides a flexible way to draw a lot of different graphs.
+
+`ggplot` contains two basic elements:
+
+1.  The initiation command:\
+    `ggplot(DATASET, aes(x=XVAR, y=YVAR, group=XVAR))`\
+    This draws a blank ggplot. Even though the x and y are specified, there are no points or lines in it.
+
+2.  Add the respective geom of interest (for this exercise you'll need:\
+    `+ geom_point()` (for scatterplot) or\
+    `+ geom_boxplot()`
+
+The full code to write a scatter plot would then be:
+
+`ggplot(DATASET, aes(x=XVAR, y=YVAR)) + geom_point()`
+:::
+
+::: callout-note
+To draw a correlation plot. Please use the "corrplot"-package.\
+Using this package, one can construct a correlation plot in two steps:
+
+1.  Use "cor" to calculate correlation between all combinations of numeric variables\
+    select numeric variables by using: `df %>% keep(is.numeric)`
+
+2.  Plot the calculated correlation by using the `corrplot` -function
+:::
+
+```{r}
+
+# Descriptive/summary statistics (e.g. mean, SDs, range)
+describe(df$SalePrice)
+```
+
+```{r}
+
+# Visualize the distribution of Y 
+# (e.g. use base-R "hist" or "ggplot" from the "ggplot2"-package)
+hist(df$SalePrice)
+
+ggplot(data = df, aes(SalePrice)) + 
+  geom_histogram()+ 
+  scale_x_continuous(limits = c(0,600000), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0,650)   , expand = c(0, 0)) +
+  labs(title="Histogram of Sale Price") +
+  ylab(label="Count") + 
+  xlab("Sale Price") +
+  theme_classic()+
+  theme(axis.title.x = element_text(colour="black", 
+                                    size=11.5, face="bold"), 
+        axis.title.y = element_text(colour="black", 
+                                    size=11.5, face="bold")) +
+  theme(plot.title   = element_text(colour="black", hjust = 0,  
+                                    size=18, face="bold"))
+```
+
+```{r}
+
+# Visualize the distribution of Y by looking at various subgroups 
+# (e.g. create boxplot or scatterplot using the "ggplot2"-package)
+
+# Scatterplot
+ggplot(df, aes(x=Lot.Area, y=SalePrice)) + 
+  geom_point() +
+  scale_x_continuous(limits = c(0,50000) , expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0,600000), expand = c(0, 0)) +
+  labs(title="Scatterplot Sale Price by Lot Area") +
+  ylab(label="Sale Price") + 
+  xlab("Lot area") +
+  theme_classic() +
+  theme(
+    axis.title.x = element_text(
+      colour = "black", size=11.5, face="bold"), 
+    axis.title.y = element_text(
+      colour = "black", size=11.5, face="bold"), 
+    plot.title = element_text(
+      colour = "black", size=18, face="bold", hjust = 0))
+
+# Boxplot
+ggplot(data=df, aes(x=Neighborhood, y=SalePrice)) + 
+  geom_boxplot() +
+  labs(title="Boxplot Sale Price by Neighbourhood") +
+  ylab(label="Sale Price") + 
+  xlab("Neighbourhood") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+```{r}
+#|label: Look at differences between housing style
+
+ggplot(data=df, aes(x=reorder(House.Style,SalePrice), y=SalePrice)) + 
+  geom_boxplot()+
+  labs(title="Boxplot Sale Price by House Style") +
+  ylab(label="Sale Price") + 
+  xlab("House Style") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))
+     
+
+```
+
+```{r}
+#| label: 'Correlation plot '
+#| 
+corr_df <- 
+  df               %>% 
+  keep(is.numeric) %>% 
+  cor
+
+corrplot(
+  corr          = corr_df, 
+  type          = "upper",
+  title         = "Correlation between all numeric variables in the dataset", 
+  diag          = FALSE,
+  order         = 'hclust',
+  hclust.method = 'median',
+  addrect       = 3,
+  number.font   = 2, 
+  tl.cex        = 0.50,
+  mar           = c(0,0,1,0)
+)
+```
+
+## Exercise 4
+
+Now that we have a better feeling of the information in the data set and we took care of the missing values, we can start by running some (additional) simple machine learning models.\
+We will use the "caret"-package for this exercise. Split the data randomly into a train set (70%) and test set (30%)
+
+```{r}
+#| label: 'split data in 70%-30%'
+#| 
+set.seed(1234)
+
+dt <- 
+  nrow(df)       %>%
+  sample(. * .7) %>% 
+  sort() 
+
+train <- df[ dt,]
+test  <- df[-dt,]
+```
+
+Next we need to specify how we want to perform the cross-validation (i.e. the optimization of the model on the train set). To this extend we need to set the method of CV, the number of folds and the numer of times we want to repeat the process. This can be done using the following command:
+
+```{r}
+#| label: Cross-validation
+#| 
+# Cross-validation strategy
+ctrl <- 
+  trainControl(
+    method = "repeatedcv",
+    number = 5,    # ten folds
+    repeats = 3)   # repeated three times
+```
+
+## Exercise 4.1
+
+Once this has been set, we are ready to run the models on the train set. Use the syntax below to estimate a LASSO model and a kNN model on the train set. Please inspect the outcomes of the model. Which model performs best on the training set?
+
+```{r}
+#| label: LASSO
+
+lambda <- 10^seq(-3,3,length=100)
+
+lassoFit <- 
+  train(
+    SalePrice ~ ., 
+    data = train, 
+    method = "glmnet", 
+    trControl = ctrl, 
+    preProcess = c("center","scale"),
+    tuneGrid = expand.grid(alpha = 1, lambda = lambda))
+
+lassoFit               # to obtain summary of the model
+varImp(lassoFit)       # to see most important parameters
+plot(varImp(lassoFit)) # to plot most important parameters
+```
+
+```{r}
+#| label: KNN
+
+## Run kNN
+knnFit <- 
+  train(
+    SalePrice ~ ., 
+    data       = train, 
+    method     = "knn", 
+    trControl  = ctrl, 
+    preProcess = c("center", "scale")
+  )
+
+knnFit               # to obtain summary of the model
+plot(knnFit)
+varImp(knnFit)       # to see most important parameters
+plot(varImp(knnFit)) # to plot most important parameters
+```
+
+## Exercise 4.2
+
+Now all we have to do is to check the performance of our best performing model on the test data set. Please use the code below to check this performance.
+
+Which model is best?
+
+```{r}
+#| label: 'compare Lasso versus KNN on RMSE'
+
+# LASSO
+pred_lassoFit <- 
+  predict(lassoFit, newdata = test)
+
+lasso_rmse <- 
+  rmse(
+    actual    = test$SalePrice,
+    predicted = pred_lassoFit
+  ) %>% 
+  round(3)
+
+# KNN
+pred_knn <- 
+  predict(knnFit, newdata = test)
+
+knn_rmse <- 
+  rmse(
+    actual    = test$SalePrice,
+    predicted = pred_knn
+  ) %>%
+  round(3)
+
+data.table(
+  Model = c("Lasso"   , "KNN"),
+  RMSE  = c(lasso_rmse, knn_rmse)
+) %T>%
+  setorder(RMSE)                  %>%
+  .[, .(Rank= 1:.N, Model, RMSE)] %>%
+  kableExtra::kbl(
+    booktabs = TRUE, caption = "Model performance",
+    align = 'l', centering = F)
+
+```
