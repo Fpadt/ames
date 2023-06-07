@@ -2,25 +2,48 @@
 title        : "Ames Housing in R"
 subtitle     : smart-R
 author       : Floris Padt
+date-format  : "DD-MM-YYYY"
 date         : '2 Jun 2023'
-date-modified: '2 Jun 2023'
+date-modified: last-modified
+description  : "JADS Foundation - cohort May 2023"
 abstract     : |
-               | JADS Ames housing
-               | excercises for JADS Foundation
+               | In the Ames Housing dataset, which is commonly used for predicting housing prices, there are several 
+               | features that can significantly influence the sales price of a house. The importance of these features 
+               | can vary depending on the specific dataset and the machine learning algorithm used for analysis. 
+               | However, based on general observations and common practices, 
+               | the following features are often considered as strong predictors of housing prices: 
+               |
+               | 1. Overall Quality: The overall quality of a house, usually measured on a scale from 1 to 10, is a crucial factor affecting its sales price. Higher-quality homes tend to command higher prices.  
+               | 2. Above Ground Living Area: The size of the above ground living area, typically measured in square feet, is a strong indicator of a house's value. Larger houses generally have higher prices.  
+               | 3. Number of Bedrooms: The number of bedrooms in a house is an important factor for many buyers. Houses with more bedrooms are typically priced higher.  
+               | 4. Number of Bathrooms: Similarly, the number of bathrooms in a house plays a significant role in determining its value. More bathrooms often lead to higher prices.  
+               | 5. Lot Size: The size of the lot on which a house is situated can influence its price. Larger lots are generally associated with higher prices, especially in desirable locations.  
+               | 6. Neighborhood: The neighborhood in which a house is located can have a significant impact on its value.  
+title-block-banner: "#FFFFF0"
 format:
   html:
+    embed-resources: true
+    smooth-scroll: true
+    theme: cosmo
+    fontcolor: "#370037"
     toc: true
+    toc-location: left
+    toc-title: Summary
+    toc-depth: 3
     code-fold: true
+    code-copy: true
+    highlight: tango
+css: smart-r.css
 editor: visual
 execute:
-  echo: false
+  echo: true
+  eval: true
 ---
-
-![](images/logo.jpg){fig-align="right"}
 
 ```{r}
 #| label: init
 #| eval:  FALSE
+#| echo: false
 
 #install.packages("renv")
 
@@ -43,45 +66,65 @@ install.packages('glmnet')
 
 ```{r}
 #| label:   setup
-#| eval:    TRUE
-#| results: hide
+#| include: false
+#| echo: false
 
 invisible({
-  library(psych)      # package to describe your data
+#  library(psych)      # package to describe your data
   library(tidyverse)  # easy way to subset your data
   library(corrplot)   # to draw correlation plots
-  library(ggplot2)    # to plot graphs
+#  library(ggplot2)    # to plot graphs | already in tidyverse
   library(caret)      # to run machine learning models
   library(Metrics)    # to calculate RMSE
   library(e1071)      # for statistical analyses
   library(glmnet)     # for statistical analyses
 
+  library(knitr)      # to knit Rmd to md
   library(kableExtra) # additional formatting for tables
   library(DT)         # D3 tables
-  library(data.table) # extension of data.frames
-  library(magrittr)   # piping
+  library(data.table) # data manipulation https://rdatatable.gitlab.io/data.table/
+#  library(magrittr)   # piping | already in tidyverse
 })
 
 options(scipen=999) # turn off scientific notation
+
+# general functions
+
+# table of missing values per variable
+f_kbl_with_NA <-
+  function(dt){
+    dt[, lapply(.SD, function(x) sum(is.na(x)))] %>%
+    melt.data.table(measure.vars = names(.))     %>%
+    .[value > 0] %>%
+    setorder(-value) %>%
+    kbl(
+      align = "l"
+    )
+  }
 ```
 
+# Ames Housing in R
 ```{r}
 #| label: read_data
 #| eval:  TRUE
+#| echo: true
 
 uri <- 
   'https://raw.githubusercontent.com/jads-nl/discover-projects/main/' %>%
   paste0(., 'ames-housing/AmesHousing.csv')
 
-df =  read.csv(uri, sep = ",", header = TRUE)
-dt <- fread(uri)
-
+df =  read.csv(uri) # data.frame
+dt <- fread(uri)    # data.table
 ```
 
-The "Ames Housing" dataset contains information from the Ames Assessor's Office used in computing assessed values for individual residential properties sold in Ames, Iowa \[IA\] from 2006 to 2010.\
+## Introduction
+
+The *Ames Housing* dataset contains information from the Ames Assessor's Office used in computing assessed values for individual residential properties sold in Ames, Iowa \[IA\] from 2006 to 2010.\
 The dataset has 2,930 observations with 82 variables. For a complete description of all included variables, please look at: <https://rdrr.io/cran/AmesHousing/man/ames_raw.html>.
 
-## Exercise 1: Familiarize yourself with the data.
+## Exercise 1: 
+
+Familiarize yourself with the data.
 
 Provide a table with descriptive statistics for all included variables and check:
 
@@ -91,11 +134,38 @@ Provide a table with descriptive statistics for all included variables and check
 
 -   Explore missing values: `sapply(df, function(x) sum(is.na(x)))`
 
-#### Data Set
+### Data Set
 
 ```{r}
 #| label: show hear using DT 
-DT::datatable(dt)
+dt %>%
+setcolorder(c("Order", "SalePrice")) %>%
+DT::datatable(
+  caption = "Table 1: Ames Housing dataset",
+  class = "compact stripe",
+  rownames = FALSE,
+  filter = 'top',
+  extensions = c('FixedColumns'),
+  options = list(
+    scrollX      = TRUE,
+    fixedColumns = list(leftColumns = 2)
+    )
+ )  %>% 
+  formatCurrency("SalePrice", '\U0024', digits = 0) %>%
+  formatStyle(
+    'SalePrice',
+    color              = "#003700",
+    fontWeight         = "bold",
+    backgroundColor    = '#FFFFF0',     
+    backgroundSize     = '100% 60%',
+    backgroundRepeat   = 'no-repeat',
+    backgroundPosition = 'center'
+  ) %>%
+  formatStyle(
+    'Order',  
+    color              = '#C0C0C0', 
+    backgroundColor    = '#FFFFF0'
+  )
 ```
 
 ::: callout-note
@@ -108,7 +178,51 @@ DT::datatable(dt)
 #| label: 'check the structure'
 
 # To check the structure of the data, you can use the "str"-command:
-str(df)
+# str(dt)
+
+# create a table with the type of the data
+dt_str <-
+  dt[, lapply(.SD, typeof)]               %>% 
+  melt.data.table(
+    measure.vars    = names(.),
+    variable.factor = FALSE)              %>%
+  setorder(value, variable )             
+
+# display a summery per type
+dt_str %>%
+  .[, .(count = .N), by = value] %>%
+  DT::datatable(
+    caption = "Table 2: Data structure summary",
+    class = "compact stripe",
+    rownames = FALSE,
+    options = list(
+      dom = "t"
+    )
+  ) %>%
+  formatStyle(
+    "value",
+    color              = "#370037",
+    backgroundColor    = "#FFFFF0",
+    fontWeight         = "bold"
+  )
+
+# display structure/type of the data  
+dt_str %>%
+  DT::datatable(
+    caption = "Table 3: Data structure and types",
+    class = "compact stripe",
+    rownames = FALSE,
+    filter = "top"
+  ) %>%
+    formatStyle(
+      "variable",
+      color              = "#370037",
+      backgroundColor    = "#FFFFF0",
+      fontWeight         = "bold"
+    )
+
+dt_chr <- dt_str[value == "character", variable]
+dt_int <- dt_str[value == "integer", variable]
 ```
 
 All factor variables now have the 'character' class.\
@@ -118,42 +232,136 @@ The following code helps to convert each character variable into a factor variab
 #| label: 'convert character to factor'
 
 df[sapply(df, is.character)] <- lapply(df[sapply(df, is.character)], as.factor)
-str(df)
+# str(df)
+
+# convert character variables to factor variables
+chr2fct <- function(x){
+    if(is.character(x)) 
+      as.factor(x) 
+    else 
+      x
+  }
+
+# convert character variables to factor variables
+# keep the integers
+dt[, names(dt):= lapply(.SD, chr2fct)]
+
+# display the factors and levels
+str(dt[, ..dt_chr])
 ```
+
+
+### Explore missing values
+
+Create a table with the number of missing values per variable.\
 
 ```{r}
 #| label: Explore missing values
 
-sapply(df, function(x) sum(is.na(x))) 
+# sapply(df, function(x) sum(is.na(x))) 
+
+# table of missing values per variable
+f_kbl_with_NA(dt) %>%
+  kable_styling(
+    full_width      = FALSE, 
+    position        = "left",
+    htmltable_class = "lighttable-hover lighttable-condensed lightable-striped"
+    ) 
 ```
+
+### Descriptive statistics
+
+Create a table with descriptive statistics for all included variables.\
+For continuous variables, you can use the `describe` function (from the psych-package).\
+For factor variables, you can use the `table` function (base-R).
 
 ```{r}
 #| label: describe numeric and integer variables
 
-df %>%
-  keep(is.numeric) %>% 
-  describe
+dt[, psych::describe(.SD), .SDcols = dt_int] %>%
+  as.data.table(keep.rownames = "cont_vars") %>%
+  DT::datatable(
+    caption  = "Table 4: Describe numerics",
+    class    = "stripe",
+    rownames = FALSE,
+    filter   = "top",
+    extensions = c('FixedColumns'),
+    options = list(
+      scrollX      = TRUE,
+      fixedColumns = list(leftColumns = 1)
+    )
+  ) %>%
+  formatStyle(
+    "cont_vars",
+    color              = "#370037",
+    backgroundColor    = "#FFFFF0",
+    fontWeight         = "bold"
+  )
+
 ```
 
 ```{r}
 #| label: describe factor variables
+#| eval:  false
+
+my_cnt <-
+  function(x){
+    data.table(col = x) %>%
+    .[, .(cnt = .N), by = col] 
+}
+
+dt<=dtb 
+
+dt[, (names(dt)) := lapply(.SD, as.factor), .SDcols = sapply(dt, is.character)]
+
+# Reshape the data.table into long format
+cols <- sapply(dt, is.factor) %>% .[.==TRUE]
+dt6  <- dt[, ..cols]
+
+dt_long <- melt(dt6, measure.vars = names(dt6), variable.name = "Column")
+
+# Create bar chart for each column
+ggplot(dt_long, aes(x = fct_infreq(value))) +
+  geom_bar() +
+  facet_wrap(~Column, scales = "free_x") +
+  labs(x = "Value", y = "Count") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+tst<- lapply(dt5, my_cnt) 
+
+  dt[, .()]
+  ggplot( mapping = aes(x = f, y = cnt)) +
+    geom_col() +
+    coord_flip() +
+    facet_wrap(facets = vars(c), scales = "free")
 
 temp <- 
   df %>%
-  keep(is.factor)
+  purrr::keep(is.factor)
 
 for (i in 1:ncol(temp)) {
   print(names(temp[i]))
-  print(table(temp[,i]))
+  print(table(temp[, i]))
 }
 ```
 
 ## Exercise 2:
 
-There a several missing values in the dataset, which need to be tackled before we can proceed with the rest of the analysis. There are many ways to impute missing values, but for now, impute missing values for numeric variables with the median, and impute missings in all factor variables with the label "100".
+There a several missing values in the dataset, which need to be tackled before we can proceed with the rest of the analysis. 
+
+There are many ways to impute missing values, but for now, impute missing values for numeric variables with the median, and impute missings in all factor variables with the label "100".
+
+### Imputation of missing values for numeric variables
 
 ```{r}
 #| label: Median imputation for continuous variables
+
+# impute NA with median for all numeric variables
+dt[, (dt_int) := lapply(.SD, function(x){
+  ifelse(is.na(x), median(x, na.rm=T), x)}), .SDcols = dt_int]
+
+# table of missing values per variable
+f_kbl_with_NA(dt)
 
 df <-
   lapply(df, function(x) {
@@ -163,6 +371,8 @@ df <-
   ) %>%
   data.frame()
 ```
+
+### Imputation of missing values for factor variables
 
 ```{r}
 #| label: 100 imputation for factor variables
@@ -180,16 +390,27 @@ df<-
   }) %>%
   data.frame()
 
+# 100 imputation for factor variables
+dt[, (dt_chr) := lapply(.SD, function(x) {
+  ifelse(is.na(x), "100", as.character(x))
+}), .SDcols = dt_chr]
+
 # convert factor variables back to factor variables 
 # (imputation turned them into character variables)
 df[factor_variables] <- lapply(df[factor_variables], factor)
+dt[, (dt_chr) := lapply(.SD, as.factor), .SDcols = dt_chr]
      
 ```
+
+### check for missing values
 
 ```{r}
 #| label: Check missing values
 
-sapply(df, function(x) sum(is.na(x)))
+# sapply(df, function(x) sum(is.na(x)))
+
+# table of missing values per variable
+f_kbl_with_NA(dt)
 ```
 
 ## Exercise 3:
@@ -239,33 +460,57 @@ Using this package, one can construct a correlation plot in two steps:
 2.  Plot the calculated correlation by using the `corrplot` -function
 :::
 
+### Descriptive/summary statistics
+
 ```{r}
 
 # Descriptive/summary statistics (e.g. mean, SDs, range)
-describe(df$SalePrice)
+dt$SalePrice                   %>%
+  psych::describe()            %>%
+  t()                          %>%
+  as.data.table(
+    keep.rownames = "stat")    %>%
+  .[, .(stat, 
+        SalesPrice = X1)]      %>%
+  kbl(
+    digits      = 0,
+    caption     = "Table 5: Descriptive statistics for Sales Price",
+    format.args = list(big.mark = ","),
+    align       = 'l'
+  ) %>%
+  kable_styling(
+    full_width      = FALSE, 
+    position        = "left",
+    htmltable_class = "lighttable-hover lighttable-condensed lightable-striped") 
+
 ```
+### Visualize the distribution of Y 
 
 ```{r}
 
 # Visualize the distribution of Y 
 # (e.g. use base-R "hist" or "ggplot" from the "ggplot2"-package)
-hist(df$SalePrice)
+hist(dt$SalePrice)
 
-ggplot(data = df, aes(SalePrice)) + 
-  geom_histogram()+ 
-  scale_x_continuous(limits = c(0,600000), expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0,650)   , expand = c(0, 0)) +
-  labs(title="Histogram of Sale Price") +
-  ylab(label="Count") + 
-  xlab("Sale Price") +
-  theme_classic()+
-  theme(axis.title.x = element_text(colour="black", 
-                                    size=11.5, face="bold"), 
-        axis.title.y = element_text(colour="black", 
-                                    size=11.5, face="bold")) +
-  theme(plot.title   = element_text(colour="black", hjust = 0,  
-                                    size=18, face="bold"))
+ggplot(data = dt, aes(SalePrice)) + 
+  geom_histogram(fill = "#370037", color = "#FFFFF0", bins = 18) + 
+  # scale_x_continuous(limits = c(0,600000), expand = c(0, 0)) +
+  # scale_y_continuous(limits = c(0,650)   , expand = c(0, 0)) +
+  labs(title = "Histogram of Sale Price") +
+  ylab(label = "Count") + 
+  xlab(label = "Sale Price") +
+  # theme_classic() +
+  theme(
+    axis.title.x = element_text(
+      colour = "#370037", size = 11.5, face = "bold"), 
+    axis.title.y = element_text(
+      colour = "#370037", size = 11.5, face = "bold"),
+    plot.title = element_text(
+      colour = "#370037", size = 18  , face = "bold", hjust = 0)
+  ) 
 ```
+
+### Visualize Y by Lot Area and Neighbourhood
 
 ```{r}
 
@@ -273,56 +518,88 @@ ggplot(data = df, aes(SalePrice)) +
 # (e.g. create boxplot or scatterplot using the "ggplot2"-package)
 
 # Scatterplot
-ggplot(df, aes(x=Lot.Area, y=SalePrice)) + 
-  geom_point() +
-  scale_x_continuous(limits = c(0,50000) , expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0,600000), expand = c(0, 0)) +
-  labs(title="Scatterplot Sale Price by Lot Area") +
-  ylab(label="Sale Price") + 
-  xlab("Lot area") +
-  theme_classic() +
+ggplot(data = dt, aes(x = `Lot Area`, y = SalePrice)) + 
+  geom_point(size = .7, color = "#370037") +
+  scale_x_continuous(limits = c(0, 50000) , expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 600000), expand = c(0, 0)) +
+  labs(title = "Scatterplot Sale Price by Lot Area") +
+  ylab(label = "Sale Price") + 
+  xlab(label = "Lot area") +
+  # theme_classic() +
   theme(
     axis.title.x = element_text(
-      colour = "black", size=11.5, face="bold"), 
+      colour = "#370037", size = 11.5, face = "bold"), 
     axis.title.y = element_text(
-      colour = "black", size=11.5, face="bold"), 
+      colour = "#370037", size = 11.5, face = "bold"), 
     plot.title = element_text(
-      colour = "black", size=18, face="bold", hjust = 0))
+      colour = "#370037", size = 18  , face = "bold", hjust = 0))
 
 # Boxplot
-ggplot(data=df, aes(x=Neighborhood, y=SalePrice)) + 
-  geom_boxplot() +
-  labs(title="Boxplot Sale Price by Neighbourhood") +
-  ylab(label="Sale Price") + 
-  xlab("Neighbourhood") +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+dt[, avgSP := mean(SalePrice), by = Neighborhood]       %>%
+  .[, Neighborhood := fct_reorder(Neighborhood, avgSP)] %>%
+  ggplot(aes(x = Neighborhood, y = SalePrice)) + 
+    geom_boxplot(color = "#370037", fill = "#FFFFF0") +
+    labs(title = "Boxplot Sale Price by Neighbourhood") +
+    ylab(label = "Sale Price") + 
+    xlab(label = "Neighbourhood") +
+    # theme_classic() +
+    theme(
+      axis.title.x = element_text(
+        colour = "#370037", size = 11.5, face = "bold"), 
+      axis.title.y = element_text(
+        colour = "#370037", size = 11.5, face = "bold"), 
+      plot.title = element_text(
+        colour = "#370037", size = 18  , face = "bold", hjust = 0),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    )
 ```
+
+### Visualize Y by House Style
+
+::: callout-note
+Box-plots are sorted by the mean of the dependent variable (SalePrice).\  
+The mean of the dependent variable is calculated for each level of the independent variable (House Style).\
+The levels of the independent variable are reordered based on the mean of the dependent variable.
+:::
 
 ```{r}
 #|label: Look at differences between housing style
-
-ggplot(data=df, aes(x=reorder(House.Style,SalePrice), y=SalePrice)) + 
-  geom_boxplot()+
-  labs(title="Boxplot Sale Price by House Style") +
-  ylab(label="Sale Price") + 
-  xlab("House Style") +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))
+dt[, avgHS := mean(SalePrice), by = `House Style`]        %>%
+  .[, `House Style` := fct_reorder(`House Style`, avgSP)] %>%
+  ggplot(aes(x = `House Style`, y = SalePrice)) + 
+    geom_boxplot(color = "#370037", fill = "#FFFFF0") +
+    labs(title = "Boxplot Sale Price by House Style") +
+    ylab(label = "Sale Price") + 
+    xlab(label = "House Style") +
+    # theme_classic() +
+    theme(
+      axis.title.x = element_text(
+        colour = "#370037", size = 11.5, face = "bold"), 
+      axis.title.y = element_text(
+        colour = "#370037", size = 11.5, face = "bold"), 
+      plot.title = element_text(
+        colour = "#370037", size = 18  , face = "bold", hjust = 0),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
      
 
 ```
 
+### Correlation plot
+
 ```{r}
 #| label: 'Correlation plot '
 #| 
-corr_df <- 
-  df               %>% 
-  keep(is.numeric) %>% 
-  cor
+# corr_df <- 
+#   df               %>% 
+#   keep(is.numeric) %>% 
+#   cor
+
+ corr_dt <-
+  dt[, ..dt_int]   %>% 
+  cor 
 
 corrplot(
-  corr          = corr_df, 
+  corr          = corr_dt, 
   type          = "upper",
   title         = "Correlation between all numeric variables in the dataset", 
   diag          = FALSE,
@@ -331,7 +608,7 @@ corrplot(
   addrect       = 3,
   number.font   = 2, 
   tl.cex        = 0.50,
-  mar           = c(0,0,1,0)
+  mar           = c(0, 0, 1, 0)
 )
 ```
 
@@ -367,12 +644,13 @@ ctrl <-
     repeats = 3)   # repeated three times
 ```
 
-## Exercise 4.1
+### Exercise 4.1
 
 Once this has been set, we are ready to run the models on the train set. Use the syntax below to estimate a LASSO model and a kNN model on the train set. Please inspect the outcomes of the model. Which model performs best on the training set?
 
 ```{r}
 #| label: LASSO
+#| eval: false
 
 lambda <- 10^seq(-3,3,length=100)
 
@@ -392,6 +670,7 @@ plot(varImp(lassoFit)) # to plot most important parameters
 
 ```{r}
 #| label: KNN
+#| eval: false
 
 ## Run kNN
 knnFit <- 
@@ -409,7 +688,7 @@ varImp(knnFit)       # to see most important parameters
 plot(varImp(knnFit)) # to plot most important parameters
 ```
 
-## Exercise 4.2
+### Exercise 4.2
 
 Now all we have to do is to check the performance of our best performing model on the test data set. Please use the code below to check this performance.
 
@@ -417,6 +696,7 @@ Which model is best?
 
 ```{r}
 #| label: 'compare Lasso versus KNN on RMSE'
+#| eval: false
 
 # LASSO
 pred_lassoFit <- 
