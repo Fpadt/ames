@@ -122,6 +122,8 @@ dt <- fread(uri)    # data.table
 The *Ames Housing* dataset contains information from the Ames Assessor's Office used in computing assessed values for individual residential properties sold in Ames, Iowa \[IA\] from 2006 to 2010.\
 The dataset has 2,930 observations with 82 variables. For a complete description of all included variables, please look at: <https://rdrr.io/cran/AmesHousing/man/ames_raw.html>.
 
+[exercises](https://jads-foundation-syllabus.netlify.app/)
+
 ## Exercise 1: 
 
 Familiarize yourself with the data.
