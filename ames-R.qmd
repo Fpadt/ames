@@ -22,6 +22,7 @@ abstract     : |
 title-block-banner: "#FFFFF0"
 format:
   html:
+    anchor-sections: true
     embed-resources: true
     smooth-scroll: true
     theme: cosmo
@@ -33,6 +34,8 @@ format:
     code-fold: true
     code-copy: true
     highlight: tango
+    link-external-icon: true
+    link-external-newwindow: true
 css: smart-r.css
 editor: visual
 execute:
@@ -48,6 +51,7 @@ execute:
 #install.packages("renv")
 
 install.packages('rmarkdown') # needed for Quarto
+install.packages('tufte')     
 install.packages('curl')
 install.packages('kableExtra')
 install.packages('DT')
@@ -101,6 +105,11 @@ f_kbl_with_NA <-
       align = "l"
     )
   }
+
+# global variable.names
+github_ames <- 
+  "https://raw.githubusercontent.com/jads-nl/discover-projects/main/ames-housing/"
+
 ```
 
 # Ames Housing in R
@@ -109,9 +118,7 @@ f_kbl_with_NA <-
 #| eval:  TRUE
 #| echo: true
 
-uri <- 
-  'https://raw.githubusercontent.com/jads-nl/discover-projects/main/' %>%
-  paste0(., 'ames-housing/AmesHousing.csv')
+uri <- paste0(github_ames, "AmesHousing.csv")
 
 df =  read.csv(uri) # data.frame
 dt <- fread(uri)    # data.table
@@ -303,6 +310,34 @@ dt[, psych::describe(.SD), .SDcols = dt_int] %>%
 
 ```
 
+### list the variables with values
+
+```{r}
+#| label: List the variables with values
+#| eval:  true
+
+ dt[, ..dt_chr] %>%
+   melt.data.table(measure.vars = dt_chr) %>%
+   unique() %>%
+     DT::datatable(
+       caption = "Table 4a: Variable Values",
+       class = "stripe",
+       rownames = FALSE,
+       filter = "top",
+       extensions = c("FixedColumns"),
+       options = list(
+         scrollX      = TRUE,
+         fixedColumns = list(leftColumns = 1)
+       )
+     ) %>%
+       formatStyle(
+         "variable",
+         color              = "#370037",
+         backgroundColor    = "#FFFFF0",
+         fontWeight         = "bold"
+       )
+```
+
 ```{r}
 #| label: describe factor variables
 #| eval:  false
@@ -416,13 +451,23 @@ dt[, (dt_chr) := lapply(.SD, as.factor), .SDcols = dt_chr]
 f_kbl_with_NA(dt)
 ```
 
-## Exercise 3:
+```{r}
+
+## Exercise 4 - 
+
+Explore the outcome variable (SalePrice) and how it correlates to other features
 
 The variable "SalePrice" refers to the price at which a property was sold and hence is the variable of interest for our prediction model ("Y" or dependent variable).
 
 Please explore Y in terms of:
 
--   Descriptive/summary statistics (e.g. mean, SDs, range)
+a. Conduct descriptive/summary statistics on the Y variable (mean, median, SD, range)
+b. Investigate how neighborhood (categorical) and grand living area (continuous) relate to the Y variable; use, e.g., bar charts, scatter plots, boxplots
+c. Visualize the distribution of the Y variable. What do you observe?
+d. Assess the distribution of SalePrice in the previous exercise. What do you observe? Log-transform the outcome variable. What does it mean for the performance of the prediction model?
+e. Assess grand living area ('Gr Liv Area') for all houses in previous exercise. What do you observe? Remove outliers. What does it mean for the applicability of the prediction model?
+f. Draw scatter plots between Y and all numerical features 
+g. Draw correlation plots to see all correlations between Y and the independent (continuous) variables (Hint: calculate Pearson correlation coefficient)
 
 -   Visualize the distribution of Y (e.g. use base-R "hist" or "ggplot" from the "ggplot2"-package)
 
@@ -540,6 +585,7 @@ ggplot(data = dt, aes(x = `Lot Area`, y = SalePrice)) +
 # Boxplot
 dt[, avgSP := mean(SalePrice), by = Neighborhood]       %>%
   .[, Neighborhood := fct_reorder(Neighborhood, avgSP)] %>%
+  .[, avgSP := NULL]                                    %>%
   ggplot(aes(x = Neighborhood, y = SalePrice)) + 
     geom_boxplot(color = "#370037", fill = "#FFFFF0") +
     labs(title = "Boxplot Sale Price by Neighbourhood") +
@@ -568,7 +614,8 @@ The levels of the independent variable are reordered based on the mean of the de
 ```{r}
 #|label: Look at differences between housing style
 dt[, avgHS := mean(SalePrice), by = `House Style`]        %>%
-  .[, `House Style` := fct_reorder(`House Style`, avgSP)] %>%
+  .[, `House Style` := fct_reorder(`House Style`, avgHS)] %>%
+  .[, avgHS := NULL]                                    %>%  
   ggplot(aes(x = `House Style`, y = SalePrice)) + 
     geom_boxplot(color = "#370037", fill = "#FFFFF0") +
     labs(title = "Boxplot Sale Price by House Style") +
@@ -582,7 +629,8 @@ dt[, avgHS := mean(SalePrice), by = `House Style`]        %>%
         colour = "#370037", size = 11.5, face = "bold"), 
       plot.title = element_text(
         colour = "#370037", size = 18  , face = "bold", hjust = 0),
-      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    )
      
 
 ```
@@ -599,7 +647,10 @@ dt[, avgHS := mean(SalePrice), by = `House Style`]        %>%
 
  corr_dt <-
   dt[, ..dt_int]   %>% 
-  cor 
+  cor(
+    use    = "everything", 
+    method = "pearson"
+  ) 
 
 corrplot(
   corr          = corr_dt, 
@@ -613,67 +664,217 @@ corrplot(
   tl.cex        = 0.50,
   mar           = c(0, 0, 1, 0)
 )
+
+corr_dt[, "SalePrice"]      %>%
+  as.data.table(
+    keep.rownames = "var",
+    check.names   = FALSE
+  )                         %>%
+  setnames(".", "corr")     %>%
+  setorder(-corr)           %>%
+  kbl()
+  
+
 ```
 
-## Exercise 4
+
+## Exercise 5 - Estimate a Linear Regression, a LASSO and a kNN model
 
 Now that we have a better feeling of the information in the data set and we took care of the missing values, we can start by running some (additional) simple machine learning models.\
+
 We will use the "caret"-package for this exercise. Split the data randomly into a train set (70%) and test set (30%)
+
+### train-test split
 
 ```{r}
 #| label: 'split data in 70%-30%'
 #| 
 set.seed(1234)
 
-dt <- 
-  nrow(df)       %>%
-  sample(. * .7) %>% 
-  sort() 
+# use the createDataPartition function to split the data
+# from the caret package
+trainIndex <- 
+  createDataPartition(dt$Order, p = 0.7, list = FALSE)
 
-train <- df[ dt,]
-test  <- df[-dt,]
+train <- dt[ trainIndex, ]
+test  <- dt[-trainIndex, ]
+
+# dt <- 
+#   nrow(df)       %>%
+#   sample(. * .7) %>% 
+#   sort() 
+
+# train <- df[ dt,]
+# test  <- df[-dt,]
 ```
 
-Next we need to specify how we want to perform the cross-validation (i.e. the optimization of the model on the train set). To this extend we need to set the method of CV, the number of folds and the numer of times we want to repeat the process. This can be done using the following command:
+### Cross-validation
+
+Next we need to specify how we want to perform the cross-validation (i.e. the optimization of the model on the train set). To this extend we need to set the method of CV, the number of folds and the numer of times we want to repeat the process. We will use the "repeatedcv" method, with 10 folds and 3 repeats.
 
 ```{r}
 #| label: Cross-validation
 #| 
-# Cross-validation strategy
+# Cross-validation strategy from the caret package
 ctrl <- 
   trainControl(
-    method = "repeatedcv",
-    number = 5,    # ten folds
+    method  = "repeatedcv",
+    number  = 5,   # ten folds
     repeats = 3)   # repeated three times
 ```
 
-### Exercise 4.1
+### Modeling
 
-Once this has been set, we are ready to run the models on the train set. Use the syntax below to estimate a LASSO model and a kNN model on the train set. Please inspect the outcomes of the model. Which model performs best on the training set?
+a. Estimate a Linear Regression model
+b. Estimate a LASSO model
+c. Estimate a kNN model
+
+#### Linear Regression model
+
+::: {.callout-caution collapse="true"}
+> now you are an teacher in data science and will teach me how to do linear regression on ames housing data set.
+:::
+
+```{r}
+#| label: Linear Regression
+#| eval:  true
+
+# Fit the linear regression model on the training data
+model <- lm(SalePrice ~ ., data = train)
+
+# View the summary of the model
+summary(model)
+
+# Extract the coefficients and their standard errors
+coefficients <- coef(model)
+
+# Extract the p-values for each coefficient
+p_values <- summary(model)$coefficients[, "Pr(>|t|)"]
+
+# create table with the coefficients and their importance measures
+data.table(
+  Variable    = names(coefficients),
+  Coefficient = coefficients,
+  P_Value     = p_values,
+  Importance  = abs(coefficients) / sum(abs(coefficients))
+) %>%
+kbl() %>%
+kable_styling(
+  full_width      = FALSE, 
+  position        = "left",
+  htmltable_class = "lighttable-hover lighttable-condensed lightable-striped",
+  extensions      = c('FixedColumns'),
+  options = list(
+    scrollX      = TRUE,
+    fixedColumns = list(leftColumns = 1),
+    font_weight  = "bold"
+    font_color   = "#370037"
+  )
+)
+```
+
+> What does it mean when in a linear regression model you have singularities and how to solve this?
+
+::: {.callout-tip collapse="true"}
+A singularity in a linear regression model means that one or more of the independent variables can be expressed as a linear combination of the other independent variables. 
+
+This is a problem because it means that the model cannot distinguish between the effects of the variables that are linearly dependent.
+
+To address singularities caused by multicollinearity, you can take the following steps:
+
+Identify the variables causing multicollinearity: Look for high pairwise correlations or examine variance inflation factors (VIF) to identify the variables that contribute to multicollinearity.
+
+Resolve multicollinearity:
+
+Remove one or more of the highly correlated variables.
+Combine correlated variables to create new composite variables.
+Use dimensionality reduction techniques like principal component analysis (PCA).
+Assess the impact: Re-estimate the model after resolving multicollinearity and examine the changes in coefficients, standard errors, and significance levels. 
+
+`r tufte::quote_footer('--- chatGPT')`
+:::
+
+> Can I use AIC to determine which variables I need to use in my linear regression model?
+
+::: {.callout-tip collapse="true"}
+
+Yes, you can use the Akaike Information Criterion (AIC) to determine which variables to include in your linear regression model. > The AIC is a metric that balances the goodness of fit of a model with its complexity, penalizing models with more parameters.
+
+The general idea is to compare the AIC values of different models with different sets of variables and select the model with the > lowest AIC as the preferred model.
+
+We initially fit a model using all potential variables. Then, we iterate over each variable and fit models without each
+variable, calculating the AIC for each reduced model. The variables with the lowest AIC values are considered the most
+informative and are selected for the final model.
+
+`r tufte::quote_footer('--- chatGPT')`
+:::
+
+```{r}
+#| label: AIC
+#| eval:  false
+
+# Fit initial model with all potential variables
+initial_model <- lm(SalePrice ~ ., data = train)
+
+# Calculate AIC for the initial model
+initial_aic <- AIC(initial_model)
+
+# Initialize a list to store the AIC values
+aic_values <- list()
+
+# Iterate over each variable to evaluate its contribution to the model
+for (var in names(train)) {
+  # Skip the dependent variable
+  if (var == "SalePrice")
+    next
+  
+  # Fit a model without the current variable
+  reduced_model <- lm(SalePrice ~ . - as.formula(var), data = train)
+  
+  # Calculate AIC for the reduced model
+  aic <- AIC(reduced_model)
+  
+  # Store the AIC value in the list
+  aic_values[[var]] <- aic
+}
+
+# Sort the AIC values in ascending order
+sorted_aic <- sort(unlist(aic_values))
+
+# Identify the variables with the lowest AIC values
+selected_vars <- names(sorted_aic)[1:k]
+
+# Build the final model using the selected variables
+final_model <- lm(SalePrice ~ ., data = train[, c("SalePrice", selected_vars)])
+
+```
+
+#### Lasso model
 
 ```{r}
 #| label: LASSO
-#| eval: false
+#| eval:  true
 
-lambda <- 10^seq(-3,3,length=100)
+lambda <- 10^seq(-3, 3, length = 100)
 
 lassoFit <- 
   train(
     SalePrice ~ ., 
-    data = train, 
-    method = "glmnet", 
-    trControl = ctrl, 
-    preProcess = c("center","scale"),
-    tuneGrid = expand.grid(alpha = 1, lambda = lambda))
+    data       = train, 
+    method     = "glmnet", 
+    trControl  = ctrl, 
+    preProcess = c("center", "scale"),
+    tuneGrid   = expand.grid(alpha = 1, lambda = lambda))
 
 lassoFit               # to obtain summary of the model
 varImp(lassoFit)       # to see most important parameters
 plot(varImp(lassoFit)) # to plot most important parameters
 ```
 
+#### kNN model
+
 ```{r}
 #| label: KNN
-#| eval: false
 
 ## Run kNN
 knnFit <- 
@@ -691,11 +892,22 @@ varImp(knnFit)       # to see most important parameters
 plot(varImp(knnFit)) # to plot most important parameters
 ```
 
-### Exercise 4.2
+## Exercise 6 - Assess which model performs best
 
-Now all we have to do is to check the performance of our best performing model on the test data set. Please use the code below to check this performance.
+### Evaluation
 
-Which model is best?
+The performance metric for the prediction model should be the Root-Mean-Squared-Error (RMSE) between the logarithm of the predicted value and the logarithm of the observed sale price. This makes it the Root-Mean-Squared-Log-Error (RMSLE). By plotting a histogram of the sale price you will understand why the logarithm is recommended.
+
+```{r}
+#| label: 'predict using linear regression'
+#| eval: false
+ 
+# Make predictions on the test data
+predictions <- predict(model, newdata = test)
+
+# Calculate evaluation metrics (e.g., RMSE)
+rmse <- caret::RMSE(predictions, test$SalePrice)
+```
 
 ```{r}
 #| label: 'compare Lasso versus KNN on RMSE'
@@ -729,8 +941,29 @@ data.table(
 ) %T>%
   setorder(RMSE)                  %>%
   .[, .(Rank= 1:.N, Model, RMSE)] %>%
-  kableExtra::kbl(
-    booktabs = TRUE, caption = "Model performance",
-    align = 'l', centering = F)
+  kbl(
+    caption = "Model performance",
+    align = 'l', 
+    centering = F
+  ) %>%
+  kable_styling(
+    full_width      = FALSE, 
+    position        = "left",
+    htmltable_class = "lighttable-hover lighttable-condensed lightable-striped"
+  ) %>%
 
+## Appendix
+
+
+```
+```{r}
+#| label: 'appendix'
+#| 
+desc <- 
+  paste0(github_ames, "data_description.txt") %>%
+  readLines()
+```
+
+```{asis}
+`r desc
 ```
