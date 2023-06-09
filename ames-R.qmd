@@ -113,6 +113,7 @@ github_ames <-
 ```
 
 # Ames Housing in R
+
 ```{r}
 #| label: read_data
 #| eval:  TRUE
@@ -129,10 +130,9 @@ dt <- fread(uri)    # data.table
 The *Ames Housing* dataset contains information from the Ames Assessor's Office used in computing assessed values for individual residential properties sold in Ames, Iowa \[IA\] from 2006 to 2010.\
 The dataset has 2,930 observations with 82 variables. For a complete description of all included variables, please look at: <https://rdrr.io/cran/AmesHousing/man/ames_raw.html>.
 
-[syllabus](https://jads-foundation-syllabus.netlify.app/)
-[Discover Projects](https://github.com/jads-nl/discover-projects)
+[syllabus](https://jads-foundation-syllabus.netlify.app/) [Discover Projects](https://github.com/jads-nl/discover-projects)
 
-## Exercise 1: 
+## Exercise 1:
 
 Familiarize yourself with the data.
 
@@ -260,7 +260,6 @@ dt[, names(dt):= lapply(.SD, chr2fct)]
 str(dt[, ..dt_chr])
 ```
 
-
 ### Explore missing values
 
 Create a table with the number of missing values per variable.\
@@ -310,33 +309,6 @@ dt[, psych::describe(.SD), .SDcols = dt_int] %>%
 
 ```
 
-### list the variables with values
-
-```{r}
-#| label: List the variables with values
-#| eval:  true
-
- dt[, ..dt_chr] %>%
-   melt.data.table(measure.vars = dt_chr) %>%
-   unique() %>%
-     DT::datatable(
-       caption = "Table 4a: Variable Values",
-       class = "stripe",
-       rownames = FALSE,
-       filter = "top",
-       extensions = c("FixedColumns"),
-       options = list(
-         scrollX      = TRUE,
-         fixedColumns = list(leftColumns = 1)
-       )
-     ) %>%
-       formatStyle(
-         "variable",
-         color              = "#370037",
-         backgroundColor    = "#FFFFF0",
-         fontWeight         = "bold"
-       )
-```
 
 ```{r}
 #| label: describe factor variables
@@ -385,7 +357,7 @@ for (i in 1:ncol(temp)) {
 
 ## Exercise 2:
 
-There a several missing values in the dataset, which need to be tackled before we can proceed with the rest of the analysis. 
+There a several missing values in the dataset, which need to be tackled before we can proceed with the rest of the analysis.
 
 There are many ways to impute missing values, but for now, impute missing values for numeric variables with the median, and impute missings in all factor variables with the label "100".
 
@@ -451,7 +423,82 @@ dt[, (dt_chr) := lapply(.SD, as.factor), .SDcols = dt_chr]
 f_kbl_with_NA(dt)
 ```
 
+### check for blank values 
+
+#### before imputation
+
 ```{r}
+#| label: Check blank values before
+
+# table of blank values per variable
+dt[, lapply(.SD, function(x) sum(trimws(x) == '', na.rm = TRUE))] %>%
+    melt.data.table(measure.vars = names(.))     %>%
+    .[value > 0] %>%
+    setorder(-value) %>%
+    kbl(
+      align = "l"
+    )
+```
+
+#### impute '100'
+
+```{r}
+# 100 imputation for factor variables
+dt[, (dt_chr) := lapply(.SD, function(x) {
+  ifelse(x == '', "100", as.character(x))
+}), .SDcols = dt_chr]
+
+# convert factor variables back to factor variables 
+dt[, (dt_chr) := lapply(.SD, as.factor), .SDcols = dt_chr]
+```
+
+#### after imputation
+
+```{r}
+#| label: Check blank values after
+
+# table of blank values per variable
+dt[, lapply(.SD, function(x) sum(trimws(x) == '', na.rm = TRUE))] %>%
+    melt.data.table(measure.vars = names(.))     %>%
+    .[value > 0] %>%
+    setorder(-value) %>%
+    kbl(
+      align = "l"
+    )
+```
+
+
+
+### list the variables and their values
+
+```{r}
+#| label: List the variables with values
+#| eval:  true
+
+dtVV <- 
+  dt[, ..dt_chr] %>%
+  melt.data.table(measure.vars = dt_chr) %>%
+  unique() 
+
+dtVV %>%
+  DT::datatable(
+    caption    = "Table 4a: Variable Values",
+    class      = "stripe",
+    rownames   = FALSE,
+    filter     = "top",
+    extensions = c("FixedColumns"),
+    options = list(
+      scrollX      = TRUE,
+      fixedColumns = list(leftColumns = 1)
+    )
+  ) %>%
+  formatStyle(
+    "variable",
+    color              = "#370037",
+    backgroundColor    = "#FFFFF0",
+    fontWeight         = "bold"
+  )
+```
 
 ## Exercise 4 - 
 
@@ -510,9 +557,9 @@ Using this package, one can construct a correlation plot in two steps:
 
 ### Descriptive/summary statistics
 
-```{r}
-
+```r{}
 # Descriptive/summary statistics (e.g. mean, SDs, range)
+
 dt$SalePrice                   %>%
   psych::describe()            %>%
   t()                          %>%
@@ -532,7 +579,8 @@ dt$SalePrice                   %>%
     htmltable_class = "lighttable-hover lighttable-condensed lightable-striped") 
 
 ```
-### Visualize the distribution of Y 
+
+### Visualize the distribution of Y
 
 ```{r}
 
@@ -541,7 +589,7 @@ dt$SalePrice                   %>%
 hist(dt$SalePrice)
 
 ggplot(data = dt, aes(SalePrice)) + 
-  geom_histogram(fill = "#370037", color = "#FFFFF0", bins = 18) + 
+  geom_histogram(fill = "#003700", color = "#FFFFF0", bins = 18) + 
   # scale_x_continuous(limits = c(0,600000), expand = c(0, 0)) +
   # scale_y_continuous(limits = c(0,650)   , expand = c(0, 0)) +
   labs(title = "Histogram of Sale Price") +
@@ -567,7 +615,7 @@ ggplot(data = dt, aes(SalePrice)) +
 
 # Scatterplot
 ggplot(data = dt, aes(x = `Lot Area`, y = SalePrice)) + 
-  geom_point(size = .7, color = "#370037") +
+  geom_point(size = .7, color = "#003700") +
   scale_x_continuous(limits = c(0, 50000) , expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 600000), expand = c(0, 0)) +
   labs(title = "Scatterplot Sale Price by Lot Area") +
@@ -587,7 +635,7 @@ dt[, avgSP := mean(SalePrice), by = Neighborhood]       %>%
   .[, Neighborhood := fct_reorder(Neighborhood, avgSP)] %>%
   .[, avgSP := NULL]                                    %>%
   ggplot(aes(x = Neighborhood, y = SalePrice)) + 
-    geom_boxplot(color = "#370037", fill = "#FFFFF0") +
+    geom_boxplot(color = "#003700", fill = "#FFFFF0") +
     labs(title = "Boxplot Sale Price by Neighbourhood") +
     ylab(label = "Sale Price") + 
     xlab(label = "Neighbourhood") +
@@ -606,8 +654,7 @@ dt[, avgSP := mean(SalePrice), by = Neighborhood]       %>%
 ### Visualize Y by House Style
 
 ::: callout-note
-Box-plots are sorted by the mean of the dependent variable (SalePrice).\  
-The mean of the dependent variable is calculated for each level of the independent variable (House Style).\
+Box-plots are sorted by the mean of the dependent variable (SalePrice).  The mean of the dependent variable is calculated for each level of the independent variable (House Style).\
 The levels of the independent variable are reordered based on the mean of the dependent variable.
 :::
 
@@ -617,7 +664,7 @@ dt[, avgHS := mean(SalePrice), by = `House Style`]        %>%
   .[, `House Style` := fct_reorder(`House Style`, avgHS)] %>%
   .[, avgHS := NULL]                                    %>%  
   ggplot(aes(x = `House Style`, y = SalePrice)) + 
-    geom_boxplot(color = "#370037", fill = "#FFFFF0") +
+    geom_boxplot(color = "#003700", fill = "#FFFFF0") +
     labs(title = "Boxplot Sale Price by House Style") +
     ylab(label = "Sale Price") + 
     xlab(label = "House Style") +
@@ -677,7 +724,6 @@ corr_dt[, "SalePrice"]      %>%
 
 ```
 
-
 ## Exercise 5 - Estimate a Linear Regression, a LASSO and a kNN model
 
 Now that we have a better feeling of the information in the data set and we took care of the missing values, we can start by running some (additional) simple machine learning models.\
@@ -725,9 +771,9 @@ ctrl <-
 
 ### Modeling
 
-a. Estimate a Linear Regression model
-b. Estimate a LASSO model
-c. Estimate a kNN model
+a.  Estimate a Linear Regression model
+b.  Estimate a LASSO model
+c.  Estimate a kNN model
 
 #### Linear Regression model
 
@@ -741,9 +787,13 @@ c. Estimate a kNN model
 
 # Fit the linear regression model on the training data
 model <- lm(SalePrice ~ ., data = train)
+model <- lm(SalePrice ~ ., data = dt)
 
 # View the summary of the model
-summary(model)
+sum_mod <- summary(model) 
+paste("Multiple R-squared:", sum_mod$r.squared,	
+      "Adjusted R-squared:", sum_mod$adj.r.squared
+)
 
 # Extract the coefficients and their standard errors
 coefficients <- coef(model)
@@ -751,32 +801,30 @@ coefficients <- coef(model)
 # Extract the p-values for each coefficient
 p_values <- summary(model)$coefficients[, "Pr(>|t|)"]
 
+# Coefficients: (6 not defined because of singularities)
+setdiff(names(coefficients), names(p_values))
+
 # create table with the coefficients and their importance measures
 data.table(
-  Variable    = names(coefficients),
-  Coefficient = coefficients,
+  Variable    = names(p_values),
+  Coefficient = coefficients[names(p_values)],
   P_Value     = p_values,
-  Importance  = abs(coefficients) / sum(abs(coefficients))
+  Importance  = abs(coefficients[names(p_values)]) / sum(abs(coefficients[names(p_values)]))
 ) %>%
+.[Importance < 0.05]    %>%
+  setorder(Importance) %>%
 kbl() %>%
 kable_styling(
   full_width      = FALSE, 
   position        = "left",
-  htmltable_class = "lighttable-hover lighttable-condensed lightable-striped",
-  extensions      = c('FixedColumns'),
-  options = list(
-    scrollX      = TRUE,
-    fixedColumns = list(leftColumns = 1),
-    font_weight  = "bold"
-    font_color   = "#370037"
-  )
+  htmltable_class = "lighttable-hover lighttable-condensed lightable-striped"
 )
 ```
 
 > What does it mean when in a linear regression model you have singularities and how to solve this?
 
 ::: {.callout-tip collapse="true"}
-A singularity in a linear regression model means that one or more of the independent variables can be expressed as a linear combination of the other independent variables. 
+A singularity in a linear regression model means that one or more of the independent variables can be expressed as a linear combination of the other independent variables.
 
 This is a problem because it means that the model cannot distinguish between the effects of the variables that are linearly dependent.
 
@@ -786,10 +834,7 @@ Identify the variables causing multicollinearity: Look for high pairwise correla
 
 Resolve multicollinearity:
 
-Remove one or more of the highly correlated variables.
-Combine correlated variables to create new composite variables.
-Use dimensionality reduction techniques like principal component analysis (PCA).
-Assess the impact: Re-estimate the model after resolving multicollinearity and examine the changes in coefficients, standard errors, and significance levels. 
+Remove one or more of the highly correlated variables. Combine correlated variables to create new composite variables. Use dimensionality reduction techniques like principal component analysis (PCA). Assess the impact: Re-estimate the model after resolving multicollinearity and examine the changes in coefficients, standard errors, and significance levels.
 
 `r tufte::quote_footer('--- chatGPT')`
 :::
@@ -797,14 +842,11 @@ Assess the impact: Re-estimate the model after resolving multicollinearity and e
 > Can I use AIC to determine which variables I need to use in my linear regression model?
 
 ::: {.callout-tip collapse="true"}
+Yes, you can use the Akaike Information Criterion (AIC) to determine which variables to include in your linear regression model. \> The AIC is a metric that balances the goodness of fit of a model with its complexity, penalizing models with more parameters.
 
-Yes, you can use the Akaike Information Criterion (AIC) to determine which variables to include in your linear regression model. > The AIC is a metric that balances the goodness of fit of a model with its complexity, penalizing models with more parameters.
+The general idea is to compare the AIC values of different models with different sets of variables and select the model with the \> lowest AIC as the preferred model.
 
-The general idea is to compare the AIC values of different models with different sets of variables and select the model with the > lowest AIC as the preferred model.
-
-We initially fit a model using all potential variables. Then, we iterate over each variable and fit models without each
-variable, calculating the AIC for each reduced model. The variables with the lowest AIC values are considered the most
-informative and are selected for the final model.
+We initially fit a model using all potential variables. Then, we iterate over each variable and fit models without each variable, calculating the AIC for each reduced model. The variables with the lowest AIC values are considered the most informative and are selected for the final model.
 
 `r tufte::quote_footer('--- chatGPT')`
 :::
@@ -956,6 +998,7 @@ data.table(
 
 
 ```
+
 ```{r}
 #| label: 'appendix'
 #| 
