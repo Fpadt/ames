@@ -19,7 +19,7 @@ abstract     : |
                | 4. Number of Bathrooms: Similarly, the number of bathrooms in a house plays a significant role in determining its value. More bathrooms often lead to higher prices.  
                | 5. Lot Size: The size of the lot on which a house is situated can influence its price. Larger lots are generally associated with higher prices, especially in desirable locations.  
                | 6. Neighborhood: The neighborhood in which a house is located can have a significant impact on its value.  
-title-block-banner: "#FFFFF0"
+title-block-banner: "#FFFFFF"
 format:
   html:
     anchor-sections: true
@@ -36,6 +36,8 @@ format:
     highlight: tango
     link-external-icon: true
     link-external-newwindow: true
+# filters: 
+#   - custom-callout.lua
 css: smart-r.css
 editor: visual
 execute:
@@ -57,7 +59,9 @@ install.packages('kableExtra')
 install.packages('DT')
 install.packages('data.table')
 install.packages('magrittr')
+install.packages('gridExtra')
 
+install.packages('broom')
 install.packages('psych')
 install.packages('tidyverse')
 install.packages('corrplot')
@@ -87,6 +91,8 @@ invisible({
   library(kableExtra) # additional formatting for tables
   library(DT)         # D3 tables
   library(data.table) # data manipulation https://rdatatable.gitlab.io/data.table/
+  library(gridExtra)  # for grid.arrange
+  library(broom)      # tidy model output
 #  library(magrittr)   # piping | already in tidyverse
 })
 
@@ -128,7 +134,8 @@ dt <- fread(uri)    # data.table
 ## Introduction
 
 The *Ames Housing* dataset contains information from the Ames Assessor's Office used in computing assessed values for individual residential properties sold in Ames, Iowa \[IA\] from 2006 to 2010.\
-The dataset has 2,930 observations with 82 variables. For a complete description of all included variables, please look at: <https://rdrr.io/cran/AmesHousing/man/ames_raw.html>.
+The dataset has 2,930 observations with 82 variables  (23 nominal, 23 ordinal, 14 discrete, and 20 continuous). 
+For a complete description of all included variables, please look at: <https://rdrr.io/cran/AmesHousing/man/ames_raw.html>.
 
 [syllabus](https://jads-foundation-syllabus.netlify.app/) [Discover Projects](https://github.com/jads-nl/discover-projects)
 
@@ -557,7 +564,7 @@ Using this package, one can construct a correlation plot in two steps:
 
 ### Descriptive/summary statistics
 
-```r{}
+```{r}
 # Descriptive/summary statistics (e.g. mean, SDs, range)
 
 dt$SalePrice                   %>%
@@ -589,7 +596,7 @@ dt$SalePrice                   %>%
 hist(dt$SalePrice)
 
 ggplot(data = dt, aes(SalePrice)) + 
-  geom_histogram(fill = "#003700", color = "#FFFFF0", bins = 18) + 
+  geom_histogram(fill = "#005100", color = "#FFFFF0", bins = 18) + 
   # scale_x_continuous(limits = c(0,600000), expand = c(0, 0)) +
   # scale_y_continuous(limits = c(0,650)   , expand = c(0, 0)) +
   labs(title = "Histogram of Sale Price") +
@@ -614,28 +621,33 @@ ggplot(data = dt, aes(SalePrice)) +
 # (e.g. create boxplot or scatterplot using the "ggplot2"-package)
 
 # Scatterplot
-ggplot(data = dt, aes(x = `Lot Area`, y = SalePrice)) + 
-  geom_point(size = .7, color = "#003700") +
-  scale_x_continuous(limits = c(0, 50000) , expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0, 600000), expand = c(0, 0)) +
-  labs(title = "Scatterplot Sale Price by Lot Area") +
-  ylab(label = "Sale Price") + 
-  xlab(label = "Lot area") +
-  # theme_classic() +
-  theme(
-    axis.title.x = element_text(
-      colour = "#370037", size = 11.5, face = "bold"), 
-    axis.title.y = element_text(
-      colour = "#370037", size = 11.5, face = "bold"), 
-    plot.title = element_text(
-      colour = "#370037", size = 18  , face = "bold", hjust = 0))
+p1 <-
+  ggplot(data = dt, aes(x = `Lot Area`, y = SalePrice)) + 
+    geom_point(size = .7, color = "#005100") +
+    scale_x_continuous(limits = c(0, 50000) , expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, 600000), expand = c(0, 0)) +
+    labs(title = "Scatterplot Sale Price by Lot Area") +
+    ylab(label = "Sale Price") + 
+    xlab(label = "Lot area") +
+    # theme_classic() +
+    theme(
+      axis.title.x = element_text(
+        colour = "#370037", size = 11.5, face = "bold"), 
+      axis.title.y = element_text(
+        colour = "#370037", size = 11.5, face = "bold"), 
+      plot.title = element_text(
+        colour = "#370037", size = 18  , face = "bold", hjust = 0))
+
+# Side-by-side plots, only 1 
+grid.arrange(p1, nrow = 1)
+
 
 # Boxplot
 dt[, avgSP := mean(SalePrice), by = Neighborhood]       %>%
   .[, Neighborhood := fct_reorder(Neighborhood, avgSP)] %>%
   .[, avgSP := NULL]                                    %>%
   ggplot(aes(x = Neighborhood, y = SalePrice)) + 
-    geom_boxplot(color = "#003700", fill = "#FFFFF0") +
+    geom_boxplot(color = "#005100", fill = "#FFFFF0") +
     labs(title = "Boxplot Sale Price by Neighbourhood") +
     ylab(label = "Sale Price") + 
     xlab(label = "Neighbourhood") +
@@ -664,7 +676,7 @@ dt[, avgHS := mean(SalePrice), by = `House Style`]        %>%
   .[, `House Style` := fct_reorder(`House Style`, avgHS)] %>%
   .[, avgHS := NULL]                                    %>%  
   ggplot(aes(x = `House Style`, y = SalePrice)) + 
-    geom_boxplot(color = "#003700", fill = "#FFFFF0") +
+    geom_boxplot(color = "#005100", fill = "#FFFFF0") +
     labs(title = "Boxplot Sale Price by House Style") +
     ylab(label = "Sale Price") + 
     xlab(label = "House Style") +
@@ -737,21 +749,13 @@ We will use the "caret"-package for this exercise. Split the data randomly into 
 #| 
 set.seed(1234)
 
-# use the createDataPartition function to split the data
-# from the caret package
-trainIndex <- 
+# use the caret::createDataPartition function to split the data
+Index <- 
   createDataPartition(dt$Order, p = 0.7, list = FALSE)
 
-train <- dt[ trainIndex, ]
-test  <- dt[-trainIndex, ]
+train <- dt[ Index, ]
+test  <- dt[-Index, ]
 
-# dt <- 
-#   nrow(df)       %>%
-#   sample(. * .7) %>% 
-#   sort() 
-
-# train <- df[ dt,]
-# test  <- df[-dt,]
 ```
 
 ### Cross-validation
@@ -760,7 +764,7 @@ Next we need to specify how we want to perform the cross-validation (i.e. the op
 
 ```{r}
 #| label: Cross-validation
-#| 
+
 # Cross-validation strategy from the caret package
 ctrl <- 
   trainControl(
@@ -777,9 +781,50 @@ c.  Estimate a kNN model
 
 #### Linear Regression model
 
-::: {.callout-caution collapse="true"}
-> now you are an teacher in data science and will teach me how to do linear regression on ames housing data set.
-:::
+```{r fig.width = 20, fig.height = 30}
+#| label: Linear Regression model
+#| eval:  true
+#| warning: false
+
+# Scatterplot with smoother lm
+
+copy(dt[, ..dt_int]) %>%
+  melt.data.table(
+    id.vars      = c("Order", "SalePrice")
+  ) %>%
+  ggplot(
+    aes(x = value     , y = SalePrice)) + 
+  geom_point(size = .7, color = "#005100") +
+  geom_smooth(
+    method = "lm",
+    se     = FALSE, 
+    color  = "#0000FF",
+    lwd    = 2 ) +
+  facet_wrap(
+    ncol   = 4, 
+    facets = ~ variable, 
+    scales = "free") +
+  # coord_cartesian(
+  #   xlim = c(0,  50000),
+  #   ylim = c(0, 600000)) +
+  labs(title = "Scatterplot Sale Price by Variable") +
+  ylab(label = "Sale Price") + 
+  # xlab(label = "Lot area") +
+  # theme_classic() +
+  theme(
+    axis.title.x = element_text(
+      colour = "#370037", size = 11.5, face = "bold"), 
+    axis.title.y = element_text(
+      colour = "#370037", size = 11.5, face = "bold"), 
+    plot.title = element_text(
+      colour = "#370037", size = 18  , face = "bold", hjust = 0))
+
+# Side-by-side plots
+# grid.arrange(p2, nrow = 1)
+
+```
+
+Calculate how well the model explains the variance in the data (R2).
 
 ```{r}
 #| label: Linear Regression
@@ -787,12 +832,12 @@ c.  Estimate a kNN model
 
 # Fit the linear regression model on the training data
 model <- lm(SalePrice ~ ., data = train)
-model <- lm(SalePrice ~ ., data = dt)
 
 # View the summary of the model
 sum_mod <- summary(model) 
-paste("Multiple R-squared:", sum_mod$r.squared,	
-      "Adjusted R-squared:", sum_mod$adj.r.squared
+paste(
+  "Multiple R-squared:", round(sum_mod$r.squared    , 3), 	
+  "Adjusted R-squared:", round(sum_mod$adj.r.squared, 3)
 )
 
 # Extract the coefficients and their standard errors
@@ -811,14 +856,25 @@ data.table(
   P_Value     = p_values,
   Importance  = abs(coefficients[names(p_values)]) / sum(abs(coefficients[names(p_values)]))
 ) %>%
-.[Importance < 0.05]    %>%
-  setorder(Importance) %>%
-kbl() %>%
-kable_styling(
-  full_width      = FALSE, 
-  position        = "left",
-  htmltable_class = "lighttable-hover lighttable-condensed lightable-striped"
-)
+.[P_Value < 0.05]     %>%
+setorder(-P_Value)    %>%
+DT::datatable(
+  caption    = "Table 6: Linear Regression model",
+  class      = "compact stripe",
+  rownames   = FALSE,
+  filter     = 'top',
+  extensions = c('FixedColumns'),
+  options = list(
+    scrollX      = TRUE,
+    fixedColumns = list(leftColumns = 1)
+    )
+ )  %>% 
+  formatStyle(
+    'Variable',
+    color              = "#003700",
+    fontWeight         = "bold",
+    backgroundColor    = '#FFFFF0'     
+  ) 
 ```
 
 > What does it mean when in a linear regression model you have singularities and how to solve this?
@@ -855,8 +911,11 @@ We initially fit a model using all potential variables. Then, we iterate over ea
 #| label: AIC
 #| eval:  false
 
-# Fit initial model with all potential variables
-initial_model <- lm(SalePrice ~ ., data = train)
+# set hyperparameter k
+k <- 10
+
+# Use the lm model generated 
+initial_model <- model
 
 # Calculate AIC for the initial model
 initial_aic <- AIC(initial_model)
@@ -864,14 +923,21 @@ initial_aic <- AIC(initial_model)
 # Initialize a list to store the AIC values
 aic_values <- list()
 
+# train_df        <- as.data.frame(train)
+train_dt <- 
+  copy(train) %>%
+  setNames(gsub(" ", "_", names(.)))
+
+# names(train_dft <- gsub(" ", "_", names(train_dt))
+
 # Iterate over each variable to evaluate its contribution to the model
-for (var in names(train)) {
+for (var in names(train_dt)) {
   # Skip the dependent variable
   if (var == "SalePrice")
     next
   
   # Fit a model without the current variable
-  reduced_model <- lm(SalePrice ~ . - as.formula(var), data = train)
+  reduced_model <- lm(formula(paste("SalePrice ~ . -", var)), data = train_dt)
   
   # Calculate AIC for the reduced model
   aic <- AIC(reduced_model)
@@ -887,9 +953,12 @@ sorted_aic <- sort(unlist(aic_values))
 selected_vars <- names(sorted_aic)[1:k]
 
 # Build the final model using the selected variables
-final_model <- lm(SalePrice ~ ., data = train[, c("SalePrice", selected_vars)])
+final_model <- 
+  lm(SalePrice ~ ., data = train_dt[, c("SalePrice", selected_vars), with = FALSE])
 
 ```
+
+
 
 #### Lasso model
 
@@ -954,6 +1023,7 @@ rmse <- caret::RMSE(predictions, test$SalePrice)
 ```{r}
 #| label: 'compare Lasso versus KNN on RMSE'
 #| eval: false
+#| warnings: false
 
 # LASSO
 pred_lassoFit <- 
@@ -1002,11 +1072,11 @@ data.table(
 ```{r}
 #| label: 'appendix'
 #| 
-desc <- 
+data_description <- 
   paste0(github_ames, "data_description.txt") %>%
   readLines()
 ```
 
 ```{asis}
-`r desc
+`r data_description`
 ```
